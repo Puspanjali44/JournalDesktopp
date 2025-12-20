@@ -1,0 +1,102 @@
+﻿@page "/entry"
+@inject NavigationManager Nav
+
+<div class="page-center entry-root @(IsDark ? "dark" : "light")">
+
+    <div class="entry-container">
+
+        <!-- Top bar -->
+        <div class="entry-top">
+            <div>
+                <h2 class="entry-heading">New Journal Entry</h2>
+                <div class="entry-date">
+                    @DateTime.Now.ToString("dddd, MMM dd")
+                </div>
+            </div>
+
+            <!-- Theme toggle -->
+            <button class="theme-btn" @onclick="ToggleTheme">
+                @(IsDark ? "☀️" : "🌙")
+            </button>
+        </div>
+
+        <input class="entry-title"
+               placeholder="Title"
+               @bind="Title" />
+
+        <div class="mood-row">
+
+            <button class="mood-chip @(Mood == "Calm" ? "active" : "")"
+                    @onclick="@(() => SetMood("Calm"))">
+                😊 Calm
+            </button>
+
+            <button class="mood-chip @(Mood == "Thoughtful" ? "active" : "")"
+                    @onclick="@(() => SetMood("Thoughtful"))">
+                💭 Thoughtful
+            </button>
+
+            <button class="mood-chip @(Mood == "Happy" ? "active" : "")"
+                    @onclick="@(() => SetMood("Happy"))">
+                😄 Happy
+            </button>
+
+            <button class="mood-chip @(Mood == "Stressed" ? "active" : "")"
+                    @onclick="@(() => SetMood("Stressed"))">
+                😵 Stressed
+            </button>
+
+        </div>
+
+        <textarea class="entry-text"
+                  placeholder="Start writing your thoughts here..."
+                  @bind="Content">
+        </textarea>
+
+        <div class="entry-bottom">
+            <p class="word-count">
+                Word count: @WordCount
+            </p>
+
+            <button class="gradient-btn" @onclick="Save">
+                Save Entry
+            </button>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(SuccessMessage))
+        {
+            <div class="success-msg">
+                @SuccessMessage
+            </div>
+        }
+
+    </div>
+</div>
+
+@code {
+    private bool IsDark = false;
+
+    private string Title = "";
+    private string Content = "";
+    private string Mood = "Calm";
+    private string SuccessMessage = "";
+
+    private int WordCount =>
+        Content.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+
+    private void ToggleTheme()
+    {
+        IsDark = !IsDark;
+    }
+
+    private void SetMood(string mood)
+    {
+        Mood = mood;
+    }
+
+    private void Save()
+    {
+        SuccessMessage = $"Entry saved successfully 😊 (Mood: {Mood})";
+        // Nav.NavigateTo("/dashboard");
+    }
+}

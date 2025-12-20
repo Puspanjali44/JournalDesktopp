@@ -1,0 +1,81 @@
+﻿@page "/dashboard"
+@inject NavigationManager NavigationManager
+
+<div class="dashboard-root @(IsDark ? "dark" : "light")">
+
+    <!-- Top Bar -->
+    <div class="dashboard-top">
+        <div>
+            <h1 class="greeting">Good evening 🌿</h1>
+            <p class="date">@DateTime.Now.ToString("dddd, MMMM dd")</p>
+        </div>
+
+        <div class="top-actions">
+            <select class="entry-filter">
+                <option>All Entries</option>
+                <option>Calm</option>
+                <option>Thoughtful</option>
+                <option>Happy</option>
+            </select>
+
+            <button class="theme-btn" @onclick="ToggleTheme">
+                @(IsDark ? "☀️" : "🌙")
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-grid">
+        <div class="stat-card large">
+            <p class="stat-label">Today's Mood</p>
+            <h2>😊 Calm</h2>
+        </div>
+
+        <div class="stat-card">
+            <p class="stat-label">Daily Streak</p>
+            <h2>🔥 7 Days</h2>
+        </div>
+
+        <div class="stat-card">
+            <p class="stat-label">Longest Streak</p>
+            <h2>🏆 14 Days</h2>
+        </div>
+    </div>
+
+    <!-- Primary Action -->
+    <button class="primary-cta" @onclick="GoToEntry">
+        Write Today's Entry
+    </button>
+
+    <!-- Recent Entries -->
+    <div class="recent-section">
+        <h2>Recent Entries</h2>
+
+        <div class="entry-item">
+            <span class="entry-date">Dec 18</span>
+            <span class="entry-mood">😊 Calm</span>
+            <span class="entry-preview">A quiet productive day...</span>
+        </div>
+
+        <div class="entry-item">
+            <span class="entry-date">Dec 17</span>
+            <span class="entry-mood">💭 Thoughtful</span>
+            <span class="entry-preview">Thinking about goals...</span>
+        </div>
+    </div>
+
+</div>
+
+@code {
+    bool IsDark = false;
+
+    void ToggleTheme()
+    {
+        IsDark = !IsDark;
+    }
+
+    void GoToEntry()
+    {
+        NavigationManager.NavigateTo("/entry");
+    }
+}

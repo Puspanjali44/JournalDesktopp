@@ -1,0 +1,41 @@
+﻿@page "/"
+@inject NavigationManager Nav
+
+<div class="page-center">
+    <div class="home-card">
+
+        <h1 class="home-title">Soft Space</h1>
+        <p class="home-tagline">
+            Reflect, record, and grow<br />
+            a little every day.
+        </p>
+
+        <!-- Illustration -->
+        <div class="home-illustration"></div>
+
+        <!-- Primary CTA -->
+        <button class="gradient-btn"
+                @onclick="GoToDashboard">
+            Start Journaling
+        </button>
+
+        <p class="home-login-text">
+            Or,
+            <a href="" @onclick="GoToLogin">log in</a>
+            to your journal
+        </p>
+
+    </div>
+</div>
+
+@code {
+    void GoToDashboard()
+    {
+        Nav.NavigateTo("/dashboard");
+    }
+
+    void GoToLogin()
+    {
+        Nav.NavigateTo("/login");
+    }
+}
