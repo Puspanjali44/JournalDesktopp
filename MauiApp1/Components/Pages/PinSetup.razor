@@ -1,0 +1,37 @@
+﻿@page "/pin-setup"
+@layout AuthLayout
+@inject MauiApp1.Data.JournalDb Db
+@inject NavigationManager Nav
+
+<div class="page-center">
+    <div class="home-card">
+
+        <h1 class="home-title">Soft Space</h1>
+        <p class="home-tagline">Create a 4-digit PIN</p>
+
+        <input type="password"
+               class="pin-input"
+               maxlength="4"
+               placeholder="••••"
+               @bind="Pin" />
+
+        <button class="gradient-btn"
+                @onclick="SavePin">
+            Save PIN
+        </button>
+
+    </div>
+</div>
+
+@code {
+    private string Pin = "";
+
+    private async Task SavePin()
+    {
+        if (Pin.Length == 4)
+        {
+            await Db.SetPinAsync(Pin);
+            Nav.NavigateTo("/dashboard", true);
+        }
+    }
+}

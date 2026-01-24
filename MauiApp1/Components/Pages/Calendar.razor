@@ -1,0 +1,59 @@
+﻿@page "/calendar"
+@inject MauiApp1.Data.JournalDb Db
+@inject NavigationManager Nav
+
+<h2 style="margin-bottom:20px;">📅 Journal Calendar</h2>
+
+<div class="calendar-grid">
+    @foreach (var day in DaysInMonth)
+    {
+        var hasEntry = EntryDates.Contains(day.Date);
+
+        <button class="calendar-day @(hasEntry ? "has-entry" : "no-entry")"
+                @onclick="() => OpenDay(day)">
+            <div class="day-number">@day.Day</div>
+            @if (hasEntry)
+            {
+                <div class="dot"></div>
+            }
+        </button>
+    }
+</div>
+
+@code {
+
+    private DateTime CurrentMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private List<DateTime> DaysInMonth = new();
+    private HashSet<DateTime> EntryDates = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        GenerateMonth();
+        await LoadEntryDates();
+    }
+
+    private void GenerateMonth()
+    {
+        DaysInMonth.Clear();
+
+        int days = DateTime.DaysInMonth(CurrentMonth.Year, CurrentMonth.Month);
+        for (int i = 1; i <= days; i++)
+        {
+            DaysInMonth.Add(new DateTime(CurrentMonth.Year, CurrentMonth.Month, i));
+        }
+    }
+
+    private async Task LoadEntryDates()
+    {
+        var entries = await Db.GetLatestAsync(1000);
+
+        EntryDates = entries
+            .Select(e => DateTime.Parse(e.EntryDateKey))
+            .ToHashSet();
+    }
+
+    private void OpenDay(DateTime date)
+    {
+        Nav.NavigateTo($"/entry?date={date:yyyy-MM-dd}");
+    }
+}

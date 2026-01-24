@@ -1,0 +1,73 @@
+﻿@page "/exports"
+@inject MauiApp1.Data.JournalDb Db
+@inject MauiApp1.Services.PdfExportService Pdf
+@inject NavigationManager Nav
+
+<h2 class="section-title">Export Journals</h2>
+
+<div class="entry-container" style="max-width:780px;">
+    <h3>Select date range</h3>
+
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px;">
+        <div style="flex:1; min-width:220px;">
+            <label>From</label>
+            <input type="date" class="entry-title" @bind="FromDateStr" />
+        </div>
+
+        <div style="flex:1; min-width:220px;">
+            <label>To</label>
+            <input type="date" class="entry-title" @bind="ToDateStr" />
+        </div>
+    </div>
+
+    <button class="gradient-btn" style="margin-top:18px;" @onclick="ExportPdf">
+        Export PDF
+    </button>
+
+    @if (!string.IsNullOrWhiteSpace(Message))
+    {
+        <div class="success-msg" style="margin-top:16px;">@Message</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <p class="error-text">@Error</p>
+    }
+</div>
+
+@code {
+    private string FromDateStr = DateTime.Today.AddDays(-7).ToString("yyyy-MM-dd");
+    private string ToDateStr = DateTime.Today.ToString("yyyy-MM-dd");
+
+    private string Message = "";
+    private string Error = "";
+
+    private async Task ExportPdf()
+    {
+        Message = "";
+        Error = "";
+
+        if (!DateTime.TryParse(FromDateStr, out var from) ||
+            !DateTime.TryParse(ToDateStr, out var to))
+        {
+            Error = "Please select valid dates.";
+            return;
+        }
+
+        if (to < from)
+        {
+            Error = "To date must be after From date.";
+            return;
+        }
+
+        var entries = await Db.GetEntriesByDateRangeAsync(from, to);
+        var pdfBytes = Pdf.CreateJournalPdf(entries, from, to);
+
+        var fileName = $"SoftSpace_Export_{from:yyyyMMdd}_{to:yyyyMMdd}.pdf";
+        var filePath = Path.Combine(FileSystem.AppDataDirectory, fileName);
+
+        File.WriteAllBytes(filePath, pdfBytes);
+
+        Message = $"PDF saved locally: {fileName}";
+    }
+}

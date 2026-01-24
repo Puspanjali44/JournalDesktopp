@@ -1,81 +1,148 @@
 ﻿@page "/dashboard"
-@inject NavigationManager NavigationManager
+@using MauiApp1.Models
+@inject NavigationManager Nav
+@inject MauiApp1.Data.JournalDb Db
 
 <div class="dashboard-root @(IsDark ? "dark" : "light")">
 
-    <!-- Top Bar -->
     <div class="dashboard-top">
         <div>
             <h1 class="greeting">Good evening 🌿</h1>
             <p class="date">@DateTime.Now.ToString("dddd, MMMM dd")</p>
         </div>
 
-        <div class="top-actions">
-            <select class="entry-filter">
-                <option>All Entries</option>
-                <option>Calm</option>
-                <option>Thoughtful</option>
-                <option>Happy</option>
-            </select>
-
-            <button class="theme-btn" @onclick="ToggleTheme">
-                @(IsDark ? "☀️" : "🌙")
-            </button>
-        </div>
+        <button class="theme-btn" @onclick="ToggleTheme">
+            @(IsDark ? "☀️" : "🌙")
+        </button>
     </div>
 
-    <!-- Stats Row -->
     <div class="stats-grid">
         <div class="stat-card large">
             <p class="stat-label">Today's Mood</p>
-            <h2>😊 Calm</h2>
+            <h2>
+                @(TodayEntry != null ? $"😊 {TodayEntry.PrimaryMood}" : "No entry yet")
+            </h2>
         </div>
 
         <div class="stat-card">
             <p class="stat-label">Daily Streak</p>
-            <h2>🔥 7 Days</h2>
+            <h2>🔥 @CurrentStreak Days</h2>
         </div>
 
         <div class="stat-card">
             <p class="stat-label">Longest Streak</p>
-            <h2>🏆 14 Days</h2>
+            <h2>🏆 @LongestStreak Days</h2>
         </div>
     </div>
 
-    <!-- Primary Action -->
     <button class="primary-cta" @onclick="GoToEntry">
         Write Today's Entry
     </button>
 
-    <!-- Recent Entries -->
-    <div class="recent-section">
-        <h2>Recent Entries</h2>
+    <button class="view-entries-btn" @onclick="GoToEntries">
+        View All Entries →
+    </button>
 
-        <div class="entry-item">
-            <span class="entry-date">Dec 18</span>
-            <span class="entry-mood">😊 Calm</span>
-            <span class="entry-preview">A quiet productive day...</span>
+    <div class="dashboard-layout">
+
+        <div class="recent-card">
+            <h3>Recent Entries</h3>
+
+            @if (RecentEntries.Any())
+            {
+                @foreach (var entry in RecentEntries)
+                {
+                    <div class="recent-item"
+                         @onclick="() => OpenEntry(entry.EntryDateKey)">
+                        <span class="recent-date">
+                            @DateTime.Parse(entry.EntryDateKey).ToString("MMM dd")
+                        </span>
+                        <span class="recent-mood">😊 @entry.PrimaryMood</span>
+                        <span class="recent-text">
+                            @(string.IsNullOrWhiteSpace(entry.Title)
+                                                ? "Untitled entry"
+                                                : entry.Title)
+                </span>
+            </div>
+                        }
+            }
+            else
+            {
+                <p>No journal entries yet.</p>
+            }
         </div>
 
-        <div class="entry-item">
-            <span class="entry-date">Dec 17</span>
-            <span class="entry-mood">💭 Thoughtful</span>
-            <span class="entry-preview">Thinking about goals...</span>
+        <div class="calendar-card">
+            <h3>@CurrentMonth.ToString("MMMM yyyy")</h3>
+
+            <div class="mini-calendar">
+                @foreach (var day in CalendarDays)
+                {
+                    <div class="mini-day @(day.HasEntry ? "has-entry" : "")"
+                         @onclick="() => OpenEntry(day.DateKey)">
+                        @day.Day
+                    </div>
+                }
+            </div>
         </div>
     </div>
-
 </div>
 
 @code {
-    bool IsDark = false;
+    private bool IsDark;
+    private JournalEntry? TodayEntry;
+    private List<JournalEntry> RecentEntries = new();
 
-    void ToggleTheme()
+    private int CurrentStreak;
+    private int LongestStreak;
+    private int MissedDays;
+
+    private DateTime CurrentMonth = DateTime.Today;
+    private List<CalendarDay> CalendarDays = new();
+
+    protected override async Task OnInitializedAsync()
     {
-        IsDark = !IsDark;
+        TodayEntry = await Db.GetByDateAsync(DateTime.Today);
+        RecentEntries = await Db.GetLatestAsync(5);
+
+        var streak = await Db.GetStreakStatsAsync();
+        CurrentStreak = streak.current;
+        LongestStreak = streak.longest;
+        MissedDays = streak.missed;
+
+        await BuildCalendarAsync();
     }
 
-    void GoToEntry()
+    private async Task BuildCalendarAsync()
     {
-        NavigationManager.NavigateTo("/entry");
+        CalendarDays.Clear();
+
+        var firstDay = new DateTime(CurrentMonth.Year, CurrentMonth.Month, 1);
+        var daysInMonth = DateTime.DaysInMonth(CurrentMonth.Year, CurrentMonth.Month);
+
+        for (int i = 0; i < daysInMonth; i++)
+        {
+            var date = firstDay.AddDays(i);
+            var entry = await Db.GetByDateAsync(date);
+
+            CalendarDays.Add(new CalendarDay
+            {
+                Day = date.Day,
+                DateKey = date.ToString("yyyy-MM-dd"),
+                HasEntry = entry != null
+            });
+        }
+    }
+
+    private void ToggleTheme() => IsDark = !IsDark;
+    private void GoToEntry() => Nav.NavigateTo("/entry");
+    private void GoToEntries() => Nav.NavigateTo("/entries");
+    private void OpenEntry(string key) => Nav.NavigateTo($"/entry/{key}");
+
+    private class CalendarDay
+    {
+        public int Day { get; set; }
+        public string DateKey { get; set; } = "";
+        public bool HasEntry { get; set; }
     }
 }

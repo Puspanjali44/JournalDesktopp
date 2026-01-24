@@ -1,27 +1,34 @@
 ﻿using Microsoft.Extensions.Logging;
+using MauiApp1.Data;
 
-namespace MauiApp1
+namespace MauiApp1;
+
+public static class MauiProgram
 {
-    public static class MauiProgram
+    public static MauiApp CreateMauiApp()
     {
-        public static MauiApp CreateMauiApp()
-        {
-            var builder = MauiApp.CreateBuilder();
-            builder
-                .UseMauiApp<App>()
-                .ConfigureFonts(fonts =>
-                {
-                    fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-                });
+        var builder = MauiApp.CreateBuilder();
 
-            builder.Services.AddMauiBlazorWebView();
+        builder
+            .UseMauiApp<App>()
+            .ConfigureFonts(fonts =>
+            {
+                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+            });
+
+        // Blazor WebView
+        builder.Services.AddMauiBlazorWebView();
+
+        // Register Journal Database (SQLite)
+        builder.Services.AddSingleton<JournalDb>();
 
 #if DEBUG
-    		builder.Services.AddBlazorWebViewDeveloperTools();
-    		builder.Logging.AddDebug();
+        builder.Services.AddBlazorWebViewDeveloperTools();
+        builder.Logging.AddDebug();
 #endif
 
-            return builder.Build();
-        }
+        return builder.Build();
+        builder.Services.AddSingleton<MauiApp1.Services.PdfExportService>();
+
     }
 }

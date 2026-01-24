@@ -1,5 +1,10 @@
 ﻿@page "/entry"
+@page "/entry/{EntryDateKey}"
+
+@using MauiApp1.Models
 @inject NavigationManager Nav
+@inject MauiApp1.Data.JournalDb Db
+@inject IJSRuntime JS
 
 <div class="page-center entry-root @(IsDark ? "dark" : "light")">
 
@@ -8,59 +13,124 @@
         <!-- Top bar -->
         <div class="entry-top">
             <div>
-                <h2 class="entry-heading">New Journal Entry</h2>
+                <h2 class="entry-heading">Journal Entry</h2>
                 <div class="entry-date">
-                    @DateTime.Now.ToString("dddd, MMM dd")
+                    @EntryDate.ToString("dddd, MMM dd")
                 </div>
             </div>
 
-            <!-- Theme toggle -->
             <button class="theme-btn" @onclick="ToggleTheme">
                 @(IsDark ? "☀️" : "🌙")
             </button>
         </div>
 
+        <!-- Title -->
         <input class="entry-title"
                placeholder="Title"
                @bind="Title" />
 
+        <!-- PRIMARY MOOD -->
+        <h4 class="section-title">Primary Mood</h4>
         <div class="mood-row">
-
-            <button class="mood-chip @(Mood == "Calm" ? "active" : "")"
-                    @onclick="@(() => SetMood("Calm"))">
-                😊 Calm
-            </button>
-
-            <button class="mood-chip @(Mood == "Thoughtful" ? "active" : "")"
-                    @onclick="@(() => SetMood("Thoughtful"))">
-                💭 Thoughtful
-            </button>
-
-            <button class="mood-chip @(Mood == "Happy" ? "active" : "")"
-                    @onclick="@(() => SetMood("Happy"))">
-                😄 Happy
-            </button>
-
-            <button class="mood-chip @(Mood == "Stressed" ? "active" : "")"
-                    @onclick="@(() => SetMood("Stressed"))">
-                😵 Stressed
-            </button>
-
+            @foreach (var category in MoodCategories)
+            {
+                @foreach (var mood in category.Value)
+                {
+                    <button class="mood-chip @(PrimaryMood == mood ? "active" : "")"
+                            @onclick="() => SetPrimaryMood(mood)">
+                        @GetMoodEmoji(mood) @mood
+                    </button>
+                }
+            }
         </div>
 
-        <textarea class="entry-text"
-                  placeholder="Start writing your thoughts here..."
-                  @bind="Content">
-        </textarea>
+        <!-- SECONDARY MOODS -->
+        <h4 class="section-title">Secondary Moods (up to 2)</h4>
+        <select class="entry-title"
+                multiple
+                @onchange="OnSecondaryMoodChanged">
+            @foreach (var category in MoodCategories)
+            {
+                <optgroup label="@category.Key">
+                    @foreach (var mood in category.Value)
+                    {
+                        @if (mood != PrimaryMood)
+                        {
+                            <option value="@mood"
+                                    selected="@SecondaryMoods.Contains(mood)">
+                                @GetMoodEmoji(mood) @mood
+                            </option>
+                        }
+                    }
+                </optgroup>
+            }
+        </select>
 
+        <!-- TAGS -->
+        <h4 class="section-title">Tags</h4>
+
+        <div class="mood-row">
+            @foreach (var tag in PredefinedTags)
+            {
+                <button class="mood-chip @(Tags.Contains(tag) ? "active" : "")"
+                        @onclick="() => ToggleTag(tag)">
+                    #@tag
+                </button>
+            }
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <input class="entry-title"
+                   placeholder="Add custom tag"
+                   @bind="NewTag"
+                   @bind:event="oninput" />
+
+            <button class="theme-btn"
+                    style="width:auto;padding:12px 16px;border-radius:14px;"
+                    @onclick="AddCustomTag">
+                ➕ Add
+            </button>
+        </div>
+
+        @if (Tags.Any())
+        {
+            <div class="mood-row" style="margin-top:12px;">
+                @foreach (var tag in Tags)
+                {
+                    <button class="mood-chip active"
+                            @onclick="() => RemoveTag(tag)">
+                        #@tag ✕
+                    </button>
+                }
+            </div>
+        }
+
+        <!-- RICH TEXT -->
+        <div id="editor"
+             class="entry-text"
+             style="background:white; min-height:260px;">
+        </div>
+
+        <!-- Bottom actions -->
         <div class="entry-bottom">
             <p class="word-count">
                 Word count: @WordCount
             </p>
 
-            <button class="gradient-btn" @onclick="Save">
-                Save Entry
-            </button>
+            <div style="display:flex; gap:12px;">
+                @if (HasEntry)
+                {
+                    <button class="theme-btn"
+                            style="width:auto;padding:12px 16px;border-radius:14px;"
+                            @onclick="DeleteEntry">
+                        🗑 Delete
+                    </button>
+                }
+
+                <button class="gradient-btn" @onclick="Save">
+                    Save Entry
+                </button>
+            </div>
         </div>
 
         @if (!string.IsNullOrWhiteSpace(SuccessMessage))
@@ -74,29 +144,183 @@
 </div>
 
 @code {
+
+    /* =============================
+       ROUTE PARAM
+    ============================= */
+
+    [Parameter]
+    public string? EntryDateKey { get; set; }
+
+    private DateTime EntryDate;
+
+    /* =============================
+       STATE
+    ============================= */
+
     private bool IsDark = false;
+    private bool HasEntry = false;
 
     private string Title = "";
-    private string Content = "";
-    private string Mood = "Calm";
+    private string ContentHtml = "";
+
+    private string PrimaryMood = "Calm";
+    private List<string> SecondaryMoods = new();
+
+    private List<string> Tags = new();
+    private string NewTag = "";
+
     private string SuccessMessage = "";
 
+    private const int MaxSecondaryMoods = 2;
+
+    private readonly List<string> PredefinedTags = new()
+    {
+        "Work", "Study", "Health", "Family", "Travel", "Personal"
+    };
+
+    private readonly Dictionary<string, List<string>> MoodCategories = new()
+    {
+        { "Positive", new() { "Happy", "Grateful", "Excited" } },
+        { "Neutral",  new() { "Calm", "Thoughtful" } },
+        { "Negative", new() { "Stressed", "Sad", "Anxious" } }
+    };
+
+    /* =============================
+       LIFECYCLE (FIXED)
+    ============================= */
+
+    protected override async Task OnInitializedAsync()
+    {
+        EntryDate = string.IsNullOrWhiteSpace(EntryDateKey)
+            ? DateTime.Today
+            : DateTime.Parse(EntryDateKey);
+
+        var existing = await Db.GetByDateAsync(EntryDate);
+
+        if (existing != null)
+        {
+            HasEntry = true;
+            Title = existing.Title;
+            ContentHtml = existing.ContentHtml;
+            PrimaryMood = string.IsNullOrWhiteSpace(existing.PrimaryMood) ? "Calm" : existing.PrimaryMood;
+
+            SecondaryMoods = string.IsNullOrWhiteSpace(existing.SecondaryMoodsCsv)
+                ? new()
+                : existing.SecondaryMoodsCsv.Split(',').ToList();
+
+            Tags = string.IsNullOrWhiteSpace(existing.TagsCsv)
+                ? new()
+                : existing.TagsCsv.Split(',').ToList();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("initQuill", "editor", ContentHtml);
+        }
+    }
+
+    /* =============================
+       COMPUTED
+    ============================= */
+
     private int WordCount =>
-        Content.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+        string.IsNullOrWhiteSpace(ContentHtml)
+            ? 0
+            : ContentHtml.Replace("<", " <")
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Length;
 
-    private void ToggleTheme()
+    /* =============================
+       ACTIONS
+    ============================= */
+
+    private void ToggleTheme() => IsDark = !IsDark;
+
+    private void SetPrimaryMood(string mood)
     {
-        IsDark = !IsDark;
+        PrimaryMood = mood;
+        SecondaryMoods.Remove(mood);
     }
 
-    private void SetMood(string mood)
+    private void OnSecondaryMoodChanged(ChangeEventArgs e)
     {
-        Mood = mood;
+        if (e.Value is not IEnumerable<string> selected)
+            return;
+
+        SecondaryMoods = selected
+            .Where(m => m != PrimaryMood)
+            .Take(MaxSecondaryMoods)
+            .ToList();
     }
 
-    private void Save()
+    private void ToggleTag(string tag)
     {
-        SuccessMessage = $"Entry saved successfully 😊 (Mood: {Mood})";
-        // Nav.NavigateTo("/dashboard");
+        if (Tags.Contains(tag))
+            Tags.Remove(tag);
+        else
+            Tags.Add(tag);
     }
+
+    private void AddCustomTag()
+    {
+        if (string.IsNullOrWhiteSpace(NewTag))
+            return;
+
+        if (!Tags.Contains(NewTag))
+            Tags.Add(NewTag.Trim());
+
+        NewTag = "";
+    }
+
+    private void RemoveTag(string tag) => Tags.Remove(tag);
+
+    private async Task Save()
+    {
+        ContentHtml = await JS.InvokeAsync<string>("getQuillHtml", "editor");
+
+        await Db.UpsertAsync(
+            EntryDate,
+            Title,
+            ContentHtml,
+            PrimaryMood,
+            SecondaryMoods,
+            Tags
+        );
+
+        HasEntry = true;
+        SuccessMessage = "Entry saved successfully ✅";
+    }
+
+    private async Task DeleteEntry()
+    {
+        await Db.DeleteByDateAsync(EntryDate);
+
+        HasEntry = false;
+        Title = "";
+        ContentHtml = "";
+        PrimaryMood = "Calm";
+        SecondaryMoods.Clear();
+        Tags.Clear();
+    }
+
+    /* =============================
+       HELPERS
+    ============================= */
+
+    private string GetMoodEmoji(string mood) => mood switch
+    {
+        "Happy" => "😄",
+        "Grateful" => "🙏",
+        "Excited" => "🤩",
+        "Calm" => "😊",
+        "Thoughtful" => "💭",
+        "Stressed" => "😵",
+        "Sad" => "😔",
+        "Anxious" => "😰",
+        _ => "🙂"
+    };
 }

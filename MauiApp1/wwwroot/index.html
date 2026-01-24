@@ -2,14 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
     <title>MauiApp1</title>
     <base href="/" />
+
+    <!-- App styles -->
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="MauiApp1.styles.css" />
-    <link href="css/app.css" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap"
+          rel="stylesheet">
+
+    <!-- Quill editor styles -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" />
 
     <link rel="icon" href="data:,">
 </head>
@@ -26,8 +35,14 @@
         <a class="dismiss">🗙</a>
     </div>
 
+    <!-- Blazor -->
     <script src="_framework/blazor.webview.js" autostart="false"></script>
 
-</body>
+    <!-- Quill editor -->
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 
+    <!-- Your Quill integration -->
+    <script src="js/quill-editor.js"></script>
+
+</body>
 </html>

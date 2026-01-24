@@ -1,0 +1,111 @@
+﻿@page "/entries"
+@using MauiApp1.Models
+@inject MauiApp1.Data.JournalDb Db
+@inject NavigationManager Nav
+
+<h2 class="section-title">All Journal Entries</h2>
+
+<div class="entries-list">
+
+    @if (PagedEntries.Any())
+    {
+        @foreach (var entry in PagedEntries)
+        {
+            var entryDate = DateTime.Parse(entry.EntryDateKey);
+
+            <div class="entry-card"
+                 @onclick="() => OpenEntry(entry.EntryDateKey)">
+
+                <div class="entry-card-date">
+                    @entryDate.ToString("MMM dd, yyyy")
+                </div>
+
+                <div class="entry-card-mood">
+                    😊 @entry.PrimaryMood
+                </div>
+
+                <div class="entry-card-title">
+                    @(string.IsNullOrWhiteSpace(entry.Title)
+                        ? "Untitled entry"
+                        : entry.Title)
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <p>No entries found.</p>
+    }
+
+</div>
+
+<!-- Pagination controls -->
+<div class="pagination-bar">
+
+    <button class="theme-btn"
+            disabled="@(_currentPage == 1)"
+            @onclick="PreviousPage">
+        ⬅ Previous
+    </button>
+
+    <span class="page-info">
+        Page @_currentPage of @_totalPages
+    </span>
+
+    <button class="theme-btn"
+            disabled="@(_currentPage == _totalPages)"
+            @onclick="NextPage">
+        Next ➡
+    </button>
+
+</div>
+
+@code {
+
+    private List<JournalEntry> PagedEntries = new();
+
+    private int _currentPage = 1;
+    private const int _pageSize = 5;
+
+    private int _totalEntries;
+    private int _totalPages;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _totalEntries = await Db.GetTotalCountAsync();
+        _totalPages = Math.Max(1,
+            (int)Math.Ceiling(_totalEntries / (double)_pageSize));
+
+        await LoadPageAsync();
+    }
+
+    private async Task LoadPageAsync()
+    {
+        int skip = (_currentPage - 1) * _pageSize;
+        PagedEntries = await Db.GetEntriesPagedAsync(skip, _pageSize);
+    }
+
+    private async Task NextPage()
+    {
+        if (_currentPage < _totalPages)
+        {
+            _currentPage++;
+            await LoadPageAsync();
+        }
+    }
+
+    private async Task PreviousPage()
+    {
+        if (_currentPage > 1)
+        {
+            _currentPage--;
+            await LoadPageAsync();
+        }
+    }
+
+    private void OpenEntry(string entryDateKey)
+    {
+        // future-ready routing
+        Nav.NavigateTo($"/entry/{entryDateKey}");
+    }
+}
