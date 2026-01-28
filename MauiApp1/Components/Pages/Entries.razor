@@ -2,22 +2,62 @@
 @using MauiApp1.Models
 @inject MauiApp1.Data.JournalDb Db
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
-<h2 class="section-title">All Journal Entries</h2>
+<!-- HEADER -->
+<div class="dashboard-top">
+    <div>
+        <h2 class="section-title">All Journal Entries</h2>
+    </div>
 
+    <!-- BACK BUTTON -->
+    <button class="theme-btn" @onclick="GoBack">
+        ←
+    </button>
+</div>
+
+<!-- 🔍 SEARCH & FILTER BAR -->
+<div class="entries-filters">
+
+    <input class="entry-filter"
+           placeholder="Search title or content..."
+           value="@SearchText"
+           @oninput="e => OnSearchChanged(e.Value?.ToString())" />
+
+    <select class="entry-filter"
+            value="@SelectedMood"
+            @onchange="e => OnMoodChanged(e.Value?.ToString())">
+        <option value="">All moods</option>
+        <option>Happy</option>
+        <option>Grateful</option>
+        <option>Excited</option>
+        <option>Calm</option>
+        <option>Thoughtful</option>
+        <option>Stressed</option>
+        <option>Sad</option>
+        <option>Anxious</option>
+    </select>
+
+    <input class="entry-filter"
+           placeholder="Tag (e.g. Work)"
+           value="@SelectedTag"
+           @oninput="e => OnTagChanged(e.Value?.ToString())" />
+
+</div>
+
+<!-- 📄 ENTRIES LIST -->
 <div class="entries-list">
 
     @if (PagedEntries.Any())
     {
         @foreach (var entry in PagedEntries)
         {
-            var entryDate = DateTime.Parse(entry.EntryDateKey);
+            var date = DateTime.Parse(entry.EntryDateKey);
 
             <div class="entry-card"
                  @onclick="() => OpenEntry(entry.EntryDateKey)">
-
                 <div class="entry-card-date">
-                    @entryDate.ToString("MMM dd, yyyy")
+                    @date.ToString("MMM dd, yyyy")
                 </div>
 
                 <div class="entry-card-mood">
@@ -39,7 +79,7 @@
 
 </div>
 
-<!-- Pagination controls -->
+<!-- ⬅➡ PAGINATION -->
 <div class="pagination-bar">
 
     <button class="theme-btn"
@@ -62,28 +102,86 @@
 
 @code {
 
+    /* =============================
+       STATE
+    ============================= */
+
     private List<JournalEntry> PagedEntries = new();
 
     private int _currentPage = 1;
     private const int _pageSize = 5;
-
-    private int _totalEntries;
     private int _totalPages;
+
+    private string SearchText = "";
+    private string SelectedMood = "";
+    private string SelectedTag = "";
+
+    /* =============================
+       LIFECYCLE
+    ============================= */
 
     protected override async Task OnInitializedAsync()
     {
-        _totalEntries = await Db.GetTotalCountAsync();
-        _totalPages = Math.Max(1,
-            (int)Math.Ceiling(_totalEntries / (double)_pageSize));
-
         await LoadPageAsync();
     }
+
+    /* =============================
+       DATA LOADING
+    ============================= */
 
     private async Task LoadPageAsync()
     {
         int skip = (_currentPage - 1) * _pageSize;
-        PagedEntries = await Db.GetEntriesPagedAsync(skip, _pageSize);
+
+        PagedEntries = await Db.SearchPagedAsync(
+            SearchText,
+            SelectedMood,
+            SelectedTag,
+            skip,
+            _pageSize
+        );
+
+        var total = await Db.SearchCountAsync(
+            SearchText,
+            SelectedMood,
+            SelectedTag
+        );
+
+        _totalPages = Math.Max(1,
+            (int)Math.Ceiling(total / (double)_pageSize));
     }
+
+    /* =============================
+       FILTER HANDLERS
+    ============================= */
+
+    private async Task OnSearchChanged(string? value)
+    {
+        SearchText = value ?? "";
+        await ResetAndReloadAsync();
+    }
+
+    private async Task OnMoodChanged(string? value)
+    {
+        SelectedMood = value ?? "";
+        await ResetAndReloadAsync();
+    }
+
+    private async Task OnTagChanged(string? value)
+    {
+        SelectedTag = value ?? "";
+        await ResetAndReloadAsync();
+    }
+
+    private async Task ResetAndReloadAsync()
+    {
+        _currentPage = 1;
+        await LoadPageAsync();
+    }
+
+    /* =============================
+       PAGINATION
+    ============================= */
 
     private async Task NextPage()
     {
@@ -103,9 +201,18 @@
         }
     }
 
+    /* =============================
+       NAVIGATION
+    ============================= */
+
     private void OpenEntry(string entryDateKey)
     {
-        // future-ready routing
         Nav.NavigateTo($"/entry/{entryDateKey}");
+    }
+
+    // ✅ TRUE BACK (previous page)
+    private async Task GoBack()
+    {
+        await JS.InvokeVoidAsync("history.back");
     }
 }

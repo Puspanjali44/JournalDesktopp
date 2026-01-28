@@ -19,9 +19,17 @@
                 </div>
             </div>
 
-            <button class="theme-btn" @onclick="ToggleTheme">
-                @(IsDark ? "☀️" : "🌙")
-            </button>
+            <div style="display:flex; gap:10px;">
+                <!-- BACK BUTTON -->
+                <button class="theme-btn" @onclick="GoBack">
+                    ←
+                </button>
+
+                <!-- THEME TOGGLE -->
+                <button class="theme-btn" @onclick="ToggleTheme">
+                    @(IsDark ? "☀️" : "🌙")
+                </button>
+            </div>
         </div>
 
         <!-- Title -->
@@ -145,18 +153,10 @@
 
 @code {
 
-    /* =============================
-       ROUTE PARAM
-    ============================= */
-
     [Parameter]
     public string? EntryDateKey { get; set; }
 
     private DateTime EntryDate;
-
-    /* =============================
-       STATE
-    ============================= */
 
     private bool IsDark = false;
     private bool HasEntry = false;
@@ -186,10 +186,6 @@
         { "Negative", new() { "Stressed", "Sad", "Anxious" } }
     };
 
-    /* =============================
-       LIFECYCLE (FIXED)
-    ============================= */
-
     protected override async Task OnInitializedAsync()
     {
         EntryDate = string.IsNullOrWhiteSpace(EntryDateKey)
@@ -218,14 +214,8 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
-        {
             await JS.InvokeVoidAsync("initQuill", "editor", ContentHtml);
-        }
     }
-
-    /* =============================
-       COMPUTED
-    ============================= */
 
     private int WordCount =>
         string.IsNullOrWhiteSpace(ContentHtml)
@@ -233,10 +223,6 @@
             : ContentHtml.Replace("<", " <")
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Length;
-
-    /* =============================
-       ACTIONS
-    ============================= */
 
     private void ToggleTheme() => IsDark = !IsDark;
 
@@ -267,10 +253,7 @@
 
     private void AddCustomTag()
     {
-        if (string.IsNullOrWhiteSpace(NewTag))
-            return;
-
-        if (!Tags.Contains(NewTag))
+        if (!string.IsNullOrWhiteSpace(NewTag) && !Tags.Contains(NewTag))
             Tags.Add(NewTag.Trim());
 
         NewTag = "";
@@ -307,9 +290,11 @@
         Tags.Clear();
     }
 
-    /* =============================
-       HELPERS
-    ============================= */
+    // ✅ TRUE BACK (previous page)
+    private async Task GoBack()
+    {
+        await JS.InvokeVoidAsync("history.back");
+    }
 
     private string GetMoodEmoji(string mood) => mood switch
     {

@@ -1,0 +1,112 @@
+﻿@page "/pinchange"
+@inject MauiApp1.Data.JournalDb Db
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<div class="page-center">
+
+    <div class="entry-container" style="max-width:420px; padding:28px;">
+
+        <!-- TOP BAR -->
+        <div class="entry-top" style="margin-bottom:24px;">
+            <h2 class="entry-heading">Change PIN 🔐</h2>
+
+            <!-- BACK BUTTON -->
+            <button class="theme-btn" @onclick="GoBack">←</button>
+        </div>
+
+        <!-- FORM -->
+        <div style="display:flex; flex-direction:column; gap:18px;">
+
+            <input class="entry-title"
+                   type="password"
+                   maxlength="4"
+                   placeholder="Current PIN"
+                   @bind="CurrentPin" />
+
+            <input class="entry-title"
+                   type="password"
+                   maxlength="4"
+                   placeholder="New PIN"
+                   @bind="NewPin" />
+
+            <input class="entry-title"
+                   type="password"
+                   maxlength="4"
+                   placeholder="Confirm New PIN"
+                   @bind="ConfirmPin" />
+
+            <button class="gradient-btn"
+                    style="width:100%; margin-top:8px;"
+                    @onclick="ChangePin">
+                Update PIN
+            </button>
+
+        </div>
+
+        <!-- ERROR -->
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <p class="error-text" style="margin-top:16px;">
+                @Error
+            </p>
+        }
+
+        <!-- SUCCESS -->
+        @if (!string.IsNullOrWhiteSpace(Success))
+        {
+            <div class="success-msg" style="margin-top:16px;">
+                @Success
+            </div>
+        }
+
+    </div>
+</div>
+
+@code {
+
+    private string CurrentPin = "";
+    private string NewPin = "";
+    private string ConfirmPin = "";
+
+    private string Error = "";
+    private string Success = "";
+
+    private async Task ChangePin()
+    {
+        Error = "";
+        Success = "";
+
+        if (CurrentPin.Length != 4 || NewPin.Length != 4)
+        {
+            Error = "PIN must be exactly 4 digits.";
+            return;
+        }
+
+        if (NewPin != ConfirmPin)
+        {
+            Error = "New PINs do not match.";
+            return;
+        }
+
+        var valid = await Db.VerifyPinAsync(CurrentPin);
+        if (!valid)
+        {
+            Error = "Current PIN is incorrect.";
+            return;
+        }
+
+        await Db.SetPinAsync(NewPin);
+
+        CurrentPin = "";
+        NewPin = "";
+        ConfirmPin = "";
+
+        Success = "PIN updated successfully ✅";
+    }
+
+    private async Task GoBack()
+    {
+        await JS.InvokeVoidAsync("history.back");
+    }
+}

@@ -1,4 +1,6 @@
-﻿@page "/exports"
+﻿@* @page "/exports"
+
+@using System.IO
 @inject MauiApp1.Data.JournalDb Db
 @inject MauiApp1.Services.PdfExportService Pdf
 @inject NavigationManager Nav
@@ -6,49 +8,96 @@
 <h2 class="section-title">Export Journals</h2>
 
 <div class="entry-container" style="max-width:780px;">
+
+    <h3>Security Check</h3>
+    <input class="entry-title"
+           type="password"
+           maxlength="4"
+           placeholder="Enter PIN to export"
+           @bind="Pin"
+           disabled="@Busy" />
+
+    <hr style="margin:18px 0;" />
+
     <h3>Select date range</h3>
 
     <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px;">
         <div style="flex:1; min-width:220px;">
             <label>From</label>
-            <input type="date" class="entry-title" @bind="FromDateStr" />
+            <input type="date"
+                   class="entry-title"
+                   @bind="FromDateStr"
+                   disabled="@Busy" />
         </div>
 
         <div style="flex:1; min-width:220px;">
             <label>To</label>
-            <input type="date" class="entry-title" @bind="ToDateStr" />
+            <input type="date"
+                   class="entry-title"
+                   @bind="ToDateStr"
+                   disabled="@Busy" />
         </div>
     </div>
 
-    <button class="gradient-btn" style="margin-top:18px;" @onclick="ExportPdf">
-        Export PDF
+    <button class="gradient-btn"
+            style="margin-top:18px;"
+            disabled="@Busy"
+            @onclick="ExportPdf">
+        @(Busy ? "Exporting..." : "Export PDF")
     </button>
 
     @if (!string.IsNullOrWhiteSpace(Message))
     {
-        <div class="success-msg" style="margin-top:16px;">@Message</div>
+        <div class="success-msg" style="margin-top:16px;">
+            @Message
+        </div>
     }
 
     @if (!string.IsNullOrWhiteSpace(Error))
     {
-        <p class="error-text">@Error</p>
+        <p class="error-text" style="margin-top:12px;">
+            @Error
+        </p>
     }
+
+    <button class="theme-btn"
+            style="margin-top:20px;"
+            disabled="@Busy"
+            @onclick="GoBack">
+        ← Back
+    </button>
+
 </div>
 
 @code {
+
+    private string Pin = "";
+
+    // HTML date inputs MUST be string
     private string FromDateStr = DateTime.Today.AddDays(-7).ToString("yyyy-MM-dd");
     private string ToDateStr = DateTime.Today.ToString("yyyy-MM-dd");
 
+    private bool Busy;
     private string Message = "";
     private string Error = "";
 
     private async Task ExportPdf()
     {
+        if (Busy) return;
+
         Message = "";
         Error = "";
 
-        if (!DateTime.TryParse(FromDateStr, out var from) ||
-            !DateTime.TryParse(ToDateStr, out var to))
+        // 🔐 PIN validation
+        if (Pin.Length != 4 || !await Db.VerifyPinAsync(Pin))
+        {
+            Error = "Invalid PIN.";
+            return;
+        }
+
+        // 📅 Date validation
+        if (!DateTime.TryParse(FromDateStr, out DateTime from) ||
+            !DateTime.TryParse(ToDateStr, out DateTime to))
         {
             Error = "Please select valid dates.";
             return;
@@ -60,14 +109,43 @@
             return;
         }
 
-        var entries = await Db.GetEntriesByDateRangeAsync(from, to);
-        var pdfBytes = Pdf.CreateJournalPdf(entries, from, to);
+        Busy = true;
+        Message = "Preparing export...";
+        StateHasChanged();
 
-        var fileName = $"SoftSpace_Export_{from:yyyyMMdd}_{to:yyyyMMdd}.pdf";
-        var filePath = Path.Combine(FileSystem.AppDataDirectory, fileName);
+        try
+        {
+            var entries = await Db.GetEntriesByDateRangeAsync(from, to);
 
-        File.WriteAllBytes(filePath, pdfBytes);
+            if (!entries.Any())
+            {
+                Error = "No journal entries found in this date range.";
+                return;
+            }
 
-        Message = $"PDF saved locally: {fileName}";
+            // ✅ EXACT LINE YOU REQUESTED (background thread)
+            var pdfBytes = await Task.Run(() =>
+                Pdf.CreateJournalPdf(entries, from, to)
+            );
+
+            var fileName = $"SoftSpace_Export_{from:yyyyMMdd}_{to:yyyyMMdd}.pdf";
+            var filePath = Path.Combine(FileSystem.AppDataDirectory, fileName);
+
+            File.WriteAllBytes(filePath, pdfBytes);
+
+            Message = $"PDF saved locally: {fileName}";
+            Pin = "";
+        }
+        catch (Exception ex)
+        {
+            Error = "Export failed: " + ex.Message;
+        }
+        finally
+        {
+            Busy = false;
+            StateHasChanged();
+        }
     }
-}
+
+    private void GoBack() => Nav.NavigateTo("/settings");
+} *@

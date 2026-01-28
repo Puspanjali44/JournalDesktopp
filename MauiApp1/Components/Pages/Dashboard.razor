@@ -7,7 +7,7 @@
 
     <div class="dashboard-top">
         <div>
-            <h1 class="greeting">Good evening 🌿</h1>
+            <h1 class="greeting">@Greeting 🌿</h1>
             <p class="date">@DateTime.Now.ToString("dddd, MMMM dd")</p>
         </div>
 
@@ -60,11 +60,11 @@
                         <span class="recent-mood">😊 @entry.PrimaryMood</span>
                         <span class="recent-text">
                             @(string.IsNullOrWhiteSpace(entry.Title)
-                                                ? "Untitled entry"
-                                                : entry.Title)
-                </span>
-            </div>
-                        }
+                                ? "Untitled entry"
+                                : entry.Title)
+                        </span>
+                    </div>
+                }
             }
             else
             {
@@ -86,9 +86,40 @@
             </div>
         </div>
     </div>
+
+    <!-- SETTINGS FAB -->
+    <button class="settings-fab" @onclick="GoToSettings">
+        ⚙️
+    </button>
+
 </div>
 
 @code {
+
+    /* =============================
+       GREETING (TIME BASED)
+    ============================= */
+
+    private string Greeting => GetGreeting();
+
+    private string GetGreeting()
+    {
+        var hour = DateTime.Now.Hour;
+
+        if (hour < 12)
+            return "Good morning";
+        else if (hour < 17)
+            return "Good afternoon";
+        else if (hour < 21)
+            return "Good evening";
+        else
+            return "Good night";
+    }
+
+    /* =============================
+       STATE
+    ============================= */
+
     private bool IsDark;
     private JournalEntry? TodayEntry;
     private List<JournalEntry> RecentEntries = new();
@@ -138,6 +169,7 @@
     private void GoToEntry() => Nav.NavigateTo("/entry");
     private void GoToEntries() => Nav.NavigateTo("/entries");
     private void OpenEntry(string key) => Nav.NavigateTo($"/entry/{key}");
+    private void GoToSettings() => Nav.NavigateTo("/settings");
 
     private class CalendarDay
     {

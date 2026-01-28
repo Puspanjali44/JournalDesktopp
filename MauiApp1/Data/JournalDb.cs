@@ -28,7 +28,6 @@ public class JournalDb
 
         _db = new SQLiteAsyncConnection(dbPath);
 
-        // Tables
         await _db.CreateTableAsync<JournalEntry>();
         await _db.CreateTableAsync<UserPin>();
     }
@@ -37,48 +36,38 @@ public class JournalDb
         => date.ToString("yyyy-MM-dd");
 
     /* =============================
-       PIN SECURITY (FEATURE 9)
+       PIN SECURITY
     ============================= */
 
     public async Task<bool> HasPinAsync()
     {
         await InitAsync();
-        return await _db!
-            .Table<UserPin>()
-            .CountAsync() > 0;
+        return await _db!.Table<UserPin>().CountAsync() > 0;
     }
 
     public async Task SetPinAsync(string pin)
     {
         await InitAsync();
-
-        // Only ONE PIN allowed
         await _db!.DeleteAllAsync<UserPin>();
 
-        var record = new UserPin
+        await _db.InsertAsync(new UserPin
         {
             PinHash = BCrypt.Net.BCrypt.HashPassword(pin)
-        };
-
-        await _db.InsertAsync(record);
+        });
     }
 
     public async Task<bool> VerifyPinAsync(string pin)
     {
         await InitAsync();
 
-        var record = await _db!
-            .Table<UserPin>()
-            .FirstOrDefaultAsync();
-
-        if (record == null)
-            return false;
+        var record = await _db!.Table<UserPin>().FirstOrDefaultAsync();
+        if (record == null) return false;
 
         return BCrypt.Net.BCrypt.Verify(pin, record.PinHash);
     }
 
     /* =============================
-       READ (BASIC)
+       READ
     ============================= */
 
     public async Task<JournalEntry?> GetByDateAsync(DateTime date)
@@ -88,8 +77,7 @@ public class JournalDb
 
         return await _db!
             .Table<JournalEntry>()
-            .Where(e => e.EntryDateKey == key)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(e => e.EntryDateKey == key);
     }
 
     public async Task<List<JournalEntry>> GetLatestAsync(int take = 20)
@@ -104,7 +92,7 @@ public class JournalDb
     }
 
     /* =============================
-       PAGINATION (FEATURE 6)
+       PAGINATION
     ============================= */
 
     public async Task<List<JournalEntry>> GetEntriesPagedAsync(int skip, int take)
@@ -122,14 +110,11 @@ public class JournalDb
     public async Task<int> GetTotalCountAsync()
     {
         await InitAsync();
-
-        return await _db!
-            .Table<JournalEntry>()
-            .CountAsync();
+        return await _db!.Table<JournalEntry>().CountAsync();
     }
 
     /* =============================
-       SEARCH + FILTER (FEATURE 7)
+       SEARCH & FILTER
     ============================= */
 
     public async Task<List<JournalEntry>> SearchPagedAsync(
@@ -144,22 +129,16 @@ public class JournalDb
         var query = _db!.Table<JournalEntry>();
 
         if (!string.IsNullOrWhiteSpace(search))
-        {
             query = query.Where(e =>
                 e.Title.Contains(search) ||
                 e.ContentHtml.Contains(search));
-        }
 
         if (!string.IsNullOrWhiteSpace(mood))
-        {
             query = query.Where(e => e.PrimaryMood == mood);
-        }
 
         if (!string.IsNullOrWhiteSpace(tag))
-        {
             query = query.Where(e =>
                 e.TagsCsv != null && e.TagsCsv.Contains(tag));
-        }
 
         return await query
             .OrderByDescending(e => e.EntryDateKey)
@@ -178,28 +157,22 @@ public class JournalDb
         var query = _db!.Table<JournalEntry>();
 
         if (!string.IsNullOrWhiteSpace(search))
-        {
             query = query.Where(e =>
                 e.Title.Contains(search) ||
                 e.ContentHtml.Contains(search));
-        }
 
         if (!string.IsNullOrWhiteSpace(mood))
-        {
             query = query.Where(e => e.PrimaryMood == mood);
-        }
 
         if (!string.IsNullOrWhiteSpace(tag))
-        {
             query = query.Where(e =>
                 e.TagsCsv != null && e.TagsCsv.Contains(tag));
-        }
 
         return await query.CountAsync();
     }
 
     /* =============================
-       STREAK TRACKING (FEATURE 8)
+       STREAK TRACKING
     ============================= */
 
     public async Task<List<DateTime>> GetAllEntryDatesAsync()
@@ -219,26 +192,18 @@ public class JournalDb
     public async Task<(int current, int longest, int missed)> GetStreakStatsAsync()
     {
         var dates = await GetAllEntryDatesAsync();
-
-        if (!dates.Any())
-            return (0, 0, 0);
+        if (!dates.Any()) return (0, 0, 0);
 
         dates = dates.Distinct().OrderBy(d => d).ToList();
 
-        int longest = 1;
-        int tempStreak = 1;
+        int longest = 1, temp = 1;
 
         for (int i = 1; i < dates.Count; i++)
         {
             if ((dates[i] - dates[i - 1]).Days == 1)
-            {
-                tempStreak++;
-                longest = Math.Max(longest, tempStreak);
-            }
+                longest = Math.Max(longest, ++temp);
             else
-            {
-                tempStreak = 1;
-            }
+                temp = 1;
         }
 
         DateTime today = DateTime.Today;
@@ -248,18 +213,15 @@ public class JournalDb
         {
             if ((dates[i] - dates[i - 1]).Days == 1)
                 current++;
-            else
-                break;
+            else break;
         }
 
-        int totalDays = (today - dates.First()).Days + 1;
-        int missed = totalDays - dates.Count;
-
+        int missed = (today - dates.First()).Days + 1 - dates.Count;
         return (current, longest, missed);
     }
 
     /* =============================
-       CREATE / UPDATE (UPSERT)
+       CREATE / UPDATE
     ============================= */
 
     public async Task<int> UpsertAsync(
@@ -275,14 +237,11 @@ public class JournalDb
         var key = DateKey(date);
         var now = DateTime.Now;
 
-        var secCsv = string.Join(",", secondaryMoods);
-        var tagCsv = string.Join(",", tags);
-
         var existing = await GetByDateAsync(date);
 
         if (existing == null)
         {
-            var entry = new JournalEntry
+            return await _db!.InsertAsync(new JournalEntry
             {
                 EntryDateKey = key,
                 CreatedAt = now,
@@ -290,23 +249,19 @@ public class JournalDb
                 Title = title ?? "",
                 ContentHtml = contentHtml ?? "",
                 PrimaryMood = primaryMood ?? "",
-                SecondaryMoodsCsv = secCsv,
-                TagsCsv = tagCsv
-            };
-
-            return await _db!.InsertAsync(entry);
+                SecondaryMoodsCsv = string.Join(",", secondaryMoods),
+                TagsCsv = string.Join(",", tags)
+            });
         }
-        else
-        {
-            existing.UpdatedAt = now;
-            existing.Title = title ?? "";
-            existing.ContentHtml = contentHtml ?? "";
-            existing.PrimaryMood = primaryMood ?? "";
-            existing.SecondaryMoodsCsv = secCsv;
-            existing.TagsCsv = tagCsv;
 
-            return await _db!.UpdateAsync(existing);
-        }
+        existing.UpdatedAt = now;
+        existing.Title = title ?? "";
+        existing.ContentHtml = contentHtml ?? "";
+        existing.PrimaryMood = primaryMood ?? "";
+        existing.SecondaryMoodsCsv = string.Join(",", secondaryMoods);
+        existing.TagsCsv = string.Join(",", tags);
+
+        return await _db!.UpdateAsync(existing);
     }
 
     /* =============================
@@ -318,23 +273,31 @@ public class JournalDb
         await InitAsync();
 
         var existing = await GetByDateAsync(date);
-        if (existing == null)
-            return 0;
+        if (existing == null) return 0;
 
         return await _db!.DeleteAsync(existing);
     }
-    public async Task<List<JournalEntry>> GetEntriesByDateRangeAsync(DateTime from, DateTime to)
+
+    /* =============================
+       DATE RANGE (FINAL & SAFE)
+    ============================= */
+
+    public async Task<List<JournalEntry>> GetEntriesByDateRangeAsync(
+        DateTime from,
+        DateTime to)
     {
         await InitAsync();
 
         var fromKey = from.ToString("yyyy-MM-dd");
         var toKey = to.ToString("yyyy-MM-dd");
 
-        return await _db!
-            .Table<JournalEntry>()
-            .Where(e => e.EntryDateKey.CompareTo(fromKey) >= 0 && e.EntryDateKey.CompareTo(toKey) <= 0)
-            .OrderBy(e => e.EntryDateKey)
-            .ToListAsync();
+        return await _db!.QueryAsync<JournalEntry>(
+            @"SELECT *
+              FROM JournalEntry
+              WHERE EntryDateKey BETWEEN ? AND ?
+              ORDER BY EntryDateKey",
+            fromKey,
+            toKey
+        );
     }
-
 }

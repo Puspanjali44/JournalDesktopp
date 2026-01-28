@@ -1,0 +1,61 @@
+﻿@page "/settings"
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<div class="dashboard-root light">
+
+    <div class="dashboard-top">
+        <div>
+            <h1 class="greeting">Settings ⚙️</h1>
+            <p class="date">Manage your preferences</p>
+        </div>
+
+        <!-- BACK BUTTON -->
+        <button class="theme-btn" @onclick="GoBack">
+            ←
+        </button>
+    </div>
+
+    <!-- SETTINGS CARDS -->
+    <div class="settings-grid">
+
+        <button class="settings-card" @onclick="GoToAnalytics">
+            <span class="settings-icon">📊</span>
+            <div class="settings-text">
+                <h3>Analytics</h3>
+                <p>View mood trends and insights</p>
+            </div>
+        </button>
+
+        <button class="settings-card" @onclick="GoToExport">
+            <span class="settings-icon">📄</span>
+            <div class="settings-text">
+                <h3>Export Journal</h3>
+                <p>Download entries as PDF</p>
+            </div>
+        </button>
+
+        <button class="settings-card" @onclick="GoToPinChange">
+            <span class="settings-icon">🔐</span>
+            <div class="settings-text">
+                <h3>Change PIN</h3>
+                <p>Update your security PIN</p>
+            </div>
+        </button>
+
+    </div>
+
+</div>
+
+@code {
+    private void GoToAnalytics() => Nav.NavigateTo("/analytics");
+    private void GoToExport() => Nav.NavigateTo("/exports");
+    private void GoToPinChange() => Nav.NavigateTo("/pinchange");
+
+
+    // ✅ REAL BACK (previous page)
+    private async Task GoBack()
+    {
+        await JS.InvokeVoidAsync("history.back");
+    }
+}
